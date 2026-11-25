@@ -349,6 +349,11 @@ public class TrackerDatabaseHelper extends SQLiteOpenHelper {
         return false;
     }
 
+    public void deleteReel(long reelId) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete(TABLE_REELS, COL_ID + " = ?", new String[]{String.valueOf(reelId)});
+    }
+
     public void clearAllReels() {
         SQLiteDatabase db = getWritableDatabase();
         db.delete(TABLE_REELS, null, null);

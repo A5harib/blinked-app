@@ -1,12 +1,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, LayoutAnimation, Platform, UIManager, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, LayoutAnimation, Platform, FlatList } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ReelData } from '../hooks/useReelsTracker';
 import { formatDuration, timeAgo } from '../utils/format';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface ReelHistoryProps {
   reels: ReelData[];

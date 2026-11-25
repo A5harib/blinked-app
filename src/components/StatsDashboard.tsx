@@ -3,15 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   ImageBackground,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { formatDuration, formatNumber } from '../utils/format';
 
-const { width } = Dimensions.get('window');
-const DIAL_SIZE = width * 0.85;
-const image_multiplier = 3.5
+const image_multiplier = 3.5;
 
 interface StatsDashboardProps {
   stats: {
@@ -27,6 +25,14 @@ interface StatsDashboardProps {
 }
 
 export function StatsDashboard({ stats }: StatsDashboardProps) {
+  const { width } = useWindowDimensions();
+  const dialSize = Math.min(width, 460) * 0.85;
+  const dialBgStyle = {
+    height: dialSize * image_multiplier,
+    width: dialSize * image_multiplier,
+    left: (-dialSize * (image_multiplier - 1)) / 2,
+    top: (-dialSize * (image_multiplier - 1)) / 2,
+  };
   return (
     <View style={styles.container}>
       {/* ── Data Pills (Top) ─────────────────────────── */}
@@ -57,31 +63,32 @@ export function StatsDashboard({ stats }: StatsDashboardProps) {
       </View>
 
       {/* ── Main Circular Dial ────────────────────────── */}
-      <View style={styles.dialContainer}>
+      <View style={[styles.dialContainer, { width: dialSize, height: dialSize }]}>
         <ImageBackground
           source={require('./circle.png')}
           resizeMode='center'
           style={styles.paperContainer}
-          imageStyle={styles.paperImage}
+          imageStyle={[styles.paperImage, dialBgStyle]}
         >
           {/* Outer Ring */}
-          <View style={styles.outerRing}>
+          <View style={[styles.outerRing, { width: dialSize, height: dialSize, borderRadius: dialSize / 2 }]}>
             {/* Middle Ring */}
-            <View style={styles.middleRing}>
+            <View style={[styles.middleRing, { width: dialSize * 0.85, height: dialSize * 0.85, borderRadius: (dialSize * 0.85) / 2 }]}>
               {/* Waveform Area (Simulated Neural Wave) */}
-              <View style={styles.waveformContainer}>
-                <View style={styles.waveformInner}>
+              <View style={[styles.waveformContainer, { width: dialSize * 0.7, height: dialSize * 0.7, borderRadius: (dialSize * 0.7) / 2 }]}>
+                <View style={[styles.waveformInner, { borderRadius: (dialSize * 0.7) / 2 }]}>
                   {/* Decorative Neural Waves */}
                   <View
                     style={[
                       styles.waveLayer,
-                      { transform: [{ rotate: '15deg' }] },
+                      { borderRadius: dialSize * 0.7 * 0.55, transform: [{ rotate: '15deg' }] },
                     ]}
                   />
                   <View
                     style={[
                       styles.waveLayer,
                       {
+                        borderRadius: dialSize * 0.7 * 0.55,
                         transform: [{ rotate: '-10deg' }],
                         borderColor: '#A67C6D22',
                       },
@@ -91,6 +98,7 @@ export function StatsDashboard({ stats }: StatsDashboardProps) {
                     style={[
                       styles.waveLayer,
                       {
+                        borderRadius: dialSize * 0.7 * 0.55,
                         transform: [{ rotate: '40deg' }],
                         borderColor: '#A67C6D11',
                       },
@@ -171,15 +179,8 @@ const styles = StyleSheet.create({
     opacity: 0.4, // Adjust opacity for desired visibility
     alignItems: 'center',
     justifyContent: 'center',
-    height: DIAL_SIZE*image_multiplier,
-    width: DIAL_SIZE*image_multiplier,
-    left:-DIAL_SIZE*(image_multiplier-1)/2,
-    top:-DIAL_SIZE*(image_multiplier-1)/2,
     transform: [{ scale: image_multiplier/2.5 }],
     filter:"blur(1px)"
-
-    
-    
   },
   container: {
     paddingHorizontal: 20,
@@ -266,16 +267,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 15,
   },
   dialContainer: {
-    width: DIAL_SIZE,
-    height: DIAL_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     position:'relative',
   },
   outerRing: {
-    width: DIAL_SIZE,
-    height: DIAL_SIZE,
-    borderRadius: DIAL_SIZE / 2,
     borderWidth: 1,
     borderColor: '#A67C6D66',
     alignItems: 'center',
@@ -283,25 +279,18 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   middleRing: {
-    width: DIAL_SIZE * 0.85,
-    height: DIAL_SIZE * 0.85,
-    borderRadius: (DIAL_SIZE * 0.85) / 2,
     borderWidth: 1.5,
     borderColor: '#A67C6D',
     alignItems: 'center',
     justifyContent: 'center',
   },
   waveformContainer: {
-    width: DIAL_SIZE * 0.7,
-    height: DIAL_SIZE * 0.7,
-    borderRadius: (DIAL_SIZE * 0.7) / 2,
     borderWidth: 1,
     borderColor: '#A67C6D33',
     padding: 4,
   },
   waveformInner: {
     flex: 1,
-    borderRadius: (DIAL_SIZE * 0.7) / 2,
     // backgroundColor: '#FDFCF9',
     borderWidth: 1.5,
     borderColor: '#333333',
@@ -313,7 +302,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '110%',
     height: '110%',
-    borderRadius: DIAL_SIZE * 0.7 * 0.55,
     borderWidth: 1,
     borderColor: '#A67C6D33',
     borderStyle: 'dashed',

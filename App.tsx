@@ -40,6 +40,25 @@ function AppContent() {
   const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
+    const keys = [
+      'toggle_metadata',
+      'toggle_watchtime',
+      'toggle_completion',
+      'toggle_engagement',
+      'toggle_ocr',
+    ];
+    Promise.all(keys.map(async k => [k, await tracker.getToggle(k)] as const)).then(
+      entries => {
+        const loaded: Record<string, boolean> = {};
+        for (const [k, v] of entries) {
+          loaded[k] = v;
+        }
+        setToggleValues(loaded);
+      },
+    );
+  }, [tracker.getToggle]);
+
+  useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -104,7 +123,7 @@ function AppContent() {
         backgroundColor="transparent"
       />
       <ImageBackground
-        source={require('./paper-texture.png')}
+        source={require('./paper-texture.jpg')}
         resizeMode="repeat"
         style={styles.paperContainer}
         imageStyle={styles.paperImage}

@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   Animated,
   Easing,
   ScrollView,
@@ -11,10 +11,6 @@ import {
 import Svg, { Path, Circle, G, Text as SvgText, Line } from 'react-native-svg';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { formatDuration } from '../utils/format';
-
-const { width } = Dimensions.get('window');
-const CLOCK_SIZE = width * 0.8;
-const CENTER = CLOCK_SIZE / 2;
 
 interface AnalyticsTabProps {
   stats: {
@@ -25,6 +21,9 @@ interface AnalyticsTabProps {
 }
 
 export function AnalyticsTab({ stats }: AnalyticsTabProps) {
+  const { width } = useWindowDimensions();
+  const clockSize = Math.min(width, 460) * 0.8;
+  const center = clockSize / 2;
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -58,19 +57,19 @@ export function AnalyticsTab({ stats }: AnalyticsTabProps) {
       {/* ── THE CELESTIAL CLOCK (TOP) ─────────────────── */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>The Celestial Clock</Text>
-        <View style={styles.clockContainer}>
-          <Svg width={CLOCK_SIZE} height={CLOCK_SIZE} viewBox={`0 0 ${CLOCK_SIZE} ${CLOCK_SIZE}`}>
+        <View style={[styles.clockContainer, { width: clockSize, height: clockSize }]}>
+          <Svg width={clockSize} height={clockSize} viewBox={`0 0 ${clockSize} ${clockSize}`}>
             {/* Background Rings */}
-            <Circle cx={CENTER} cy={CENTER} r={CENTER - 20} stroke="#A67C6D22" strokeWidth="1" fill="none" />
-            <Circle cx={CENTER} cy={CENTER} r={CENTER - 40} stroke="#A67C6D11" strokeWidth="1" fill="none" />
+            <Circle cx={center} cy={center} r={center - 20} stroke="#A67C6D22" strokeWidth="1" fill="none" />
+            <Circle cx={center} cy={center} r={center - 40} stroke="#A67C6D11" strokeWidth="1" fill="none" />
             
             {/* Hour Markers */}
             {[...Array(24)].map((_, i) => {
               const angle = (i * 15 - 90) * (Math.PI / 180);
-              const x1 = CENTER + (CENTER - 25) * Math.cos(angle);
-              const y1 = CENTER + (CENTER - 25) * Math.sin(angle);
-              const x2 = CENTER + (CENTER - 15) * Math.cos(angle);
-              const y2 = CENTER + (CENTER - 15) * Math.sin(angle);
+              const x1 = center + (center - 25) * Math.cos(angle);
+              const y1 = center + (center - 25) * Math.sin(angle);
+              const x2 = center + (center - 15) * Math.cos(angle);
+              const y2 = center + (center - 15) * Math.sin(angle);
               return <Line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#A67C6D44" strokeWidth="1" />;
             })}
 
@@ -79,11 +78,11 @@ export function AnalyticsTab({ stats }: AnalyticsTabProps) {
               if (val === 0) return null;
               const angle = (i * 15 - 90) * (Math.PI / 180);
               const maxVal = Math.max(...(stats.hourlyActivity || [1]));
-              const barLength = (val / maxVal) * (CENTER - 60);
-              const x2 = CENTER + (40 + barLength) * Math.cos(angle);
-              const y2 = CENTER + (40 + barLength) * Math.sin(angle);
-              const x1 = CENTER + 40 * Math.cos(angle);
-              const y1 = CENTER + 40 * Math.sin(angle);
+              const barLength = (val / maxVal) * (center - 60);
+              const x2 = center + (40 + barLength) * Math.cos(angle);
+              const y2 = center + (40 + barLength) * Math.sin(angle);
+              const x1 = center + 40 * Math.cos(angle);
+              const y1 = center + 40 * Math.sin(angle);
 
               return (
                 <Line
@@ -101,8 +100,8 @@ export function AnalyticsTab({ stats }: AnalyticsTabProps) {
             })}
 
             {/* Central Eye */}
-            <Circle cx={CENTER} cy={CENTER} r={30} fill="#FDFCF9" stroke="#333333" strokeWidth="1.5" />
-            <Icon name="eye-outline" size={24} color="#333333" style={{ position: 'absolute', top: CENTER - 12, left: CENTER - 12 }} />
+            <Circle cx={center} cy={center} r={30} fill="#FDFCF9" stroke="#333333" strokeWidth="1.5" />
+            <Icon name="eye-outline" size={24} color="#333333" style={{ position: 'absolute', top: center - 12, left: center - 12 }} />
           </Svg>
           
           <View style={styles.clockOverlay}>
@@ -116,7 +115,7 @@ export function AnalyticsTab({ stats }: AnalyticsTabProps) {
       {/* ── THE NEURAL WEB (MIDDLE) ──────────────────── */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>The Neural Web</Text>
-        <View style={styles.webContainer}>
+        <View style={[styles.webContainer, { width: width - 40 }]}>
           <Animated.View
             style={[
               styles.webInner,
@@ -143,7 +142,7 @@ export function AnalyticsTab({ stats }: AnalyticsTabProps) {
                   key={i}
                   style={[
                     styles.keywordNode,
-                    { left: CENTER + x - 40, top: CENTER + y - 100, transform: [{ scale: 0.8 + (kw.value / 10) }] },
+                    { left: (width - 40) / 2 + x - 40, top: 150 + y - 14, transform: [{ scale: 0.8 + Math.min(kw.value, 10) / 10 }] },
                   ]}
                 >
                   <Text style={styles.keywordText}>{kw.text.toUpperCase()}</Text>
@@ -216,8 +215,6 @@ const styles = StyleSheet.create({
     fontFamily: 'serif',
   },
   clockContainer: {
-    width: CLOCK_SIZE,
-    height: CLOCK_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -240,7 +237,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   webContainer: {
-    width: width - 40,
     height: 300,
     alignItems: 'center',
     justifyContent: 'center',

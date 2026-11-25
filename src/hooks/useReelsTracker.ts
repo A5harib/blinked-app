@@ -1,11 +1,10 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
-import { 
-  loadReels, 
-  insertReel, 
-  updateReel, 
-  clearAllReels, 
-  calculateStatsFromSql 
+import { useEffect, useState, useCallback } from 'react';
+import { AppState, NativeModules, NativeEventEmitter, Platform } from 'react-native';
+import {
+  loadReels,
+  updateReel,
+  clearAllReels,
+  calculateStatsFromSql,
 } from '../utils/reelsStore';
 
 const { ReelsTrackerModule } = NativeModules;
@@ -81,11 +80,6 @@ export function useReelsTracker() {
   const [recentReels, setRecentReels] = useState<ReelData[]>([]);
   const [liveEvent, setLiveEvent] = useState<{ name: string; data: any } | null>(null);
 
-  // References to keep track of active state and scroll settling
-  const activeReelId = useRef<number>(-1);
-  const activeReelTimestamp = useRef<number>(0);
-  const settlingTimer = useRef<NodeJS.Timeout | null>(null);
-  
   const checkService = useCallback(async () => {
     if (!ReelsTrackerModule) return;
     try {
@@ -126,6 +120,15 @@ export function useReelsTracker() {
   const setToggle = useCallback(async (key: string, value: boolean) => {
     if (!ReelsTrackerModule) return;
     await ReelsTrackerModule.setToggle(key, value);
+  }, []);
+
+  const getToggle = useCallback(async (key: string): Promise<boolean> => {
+    if (!ReelsTrackerModule) return true;
+    try {
+      return await ReelsTrackerModule.getToggle(key);
+    } catch {
+      return true;
+    }
   }, []);
 
   const clearHistory = useCallback(async () => {
@@ -249,113 +252,61 @@ export function useReelsTracker() {
 
     if (!eventEmitter) return;
 
+    // The accessibility service records reels into SQLite on its own, because JS
+    // timers are paused while ScrollSoul sits in the background. These listeners
+    // only refresh the UI and run optional OCR for the reel the service saved.
     const subs = [
       eventEmitter.addListener('onReelScrolled', async (e) => {
-        const data = JSON.parse(e.data); // data has: username, caption, likeCount, timestamp
+        const data = JSON.parse(e.data); // username, caption, likeCount, timestamp, reelId
         setLiveEvent({ name: 'scroll', data });
+        setStatus(prev => ({
+          ...prev,
+          currentReelId: data.reelId,
+          currentUsername: data.username || 'Scanning...',
+        }));
+        refreshStatsAndReels();
 
-        // 1. Finalize watch time of the previous reel if active
-        if (activeReelId.current !== -1) {
-          const watchTime = Date.now() - activeReelTimestamp.current;
-          await updateReel(activeReelId.current, { watchTimeMs: watchTime });
-          activeReelId.current = -1;
-        }
-
-        // 2. Cancel any pending settled scroll timers (the user is scrolling rapidly)
-        if (settlingTimer.current) {
-          clearTimeout(settlingTimer.current);
-          settlingTimer.current = null;
-        }
-
-        // 3. Start a settling timer for 1.5 seconds (the "Perfect Scrolling Logic")
-        // This ensures OCR and database insertion only run once the user has successfully scrolled and paused
-        const scrapedUser = data.username || '';
-        const scrapedCaption = data.caption || '';
-        const scrollTime = Date.now();
-
-        settlingTimer.current = setTimeout(async () => {
-          // Settled on new reel! Let's insert the new reel record into the JS database
-          const currentId = await insertReel(scrapedUser, scrapedCaption);
-          activeReelId.current = currentId;
-          activeReelTimestamp.current = scrollTime;
-
-          setStatus(prev => ({
-            ...prev,
-            currentReelId: currentId,
-            currentUsername: scrapedUser || 'Scanning...',
-          }));
-
-          // Trigger OCR if enabled in preferences
-          const ocrEnabled = await ReelsTrackerModule?.getToggle("toggle_ocr");
-          if (ocrEnabled && ReelsTrackerModule) {
-            try {
-              const base64 = await ReelsTrackerModule.takeScreenshot();
-              
-              // Run OCR asynchronously
-              performGroqOcr(base64).then(async (ocrResults) => {
-                await updateReel(currentId, {
-                  username: ocrResults.username || scrapedUser || 'unknown',
-                  caption: ocrResults.caption || scrapedCaption || '',
-                  ocrText: ocrResults.ocrText
-                });
-                refreshStatsAndReels();
-              });
-
-            } catch (err) {
-              console.warn("Screenshot capture error:", err);
-            }
+        const ocrEnabled = await ReelsTrackerModule?.getToggle('toggle_ocr');
+        if (ocrEnabled && data.reelId > 0 && GROQ_API_KEY !== 'YOUR_GROQ_API_KEY_HERE') {
+          try {
+            const base64 = await ReelsTrackerModule.takeScreenshot();
+            const ocr = await performGroqOcr(base64);
+            await updateReel(data.reelId, {
+              username: ocr.username || data.username || 'unknown',
+              caption: ocr.caption || data.caption || '',
+              ocrText: ocr.ocrText,
+            });
+            refreshStatsAndReels();
+          } catch (err) {
+            console.warn('OCR error:', err);
           }
-
-          refreshStatsAndReels();
-        }, 1500);
+        }
       }),
 
-      eventEmitter.addListener('onProgressUpdate', async (e) => {
-        const data = JSON.parse(e.data); // data has: completionPercent, liked, commented, shared
-        setLiveEvent({ name: 'progress', data });
-
-        if (activeReelId.current !== -1) {
-          await updateReel(activeReelId.current, {
-            completionPercent: data.completionPercent,
-            liked: data.liked,
-            commented: data.commented,
-            shared: data.shared
-          });
-          
-          // Smooth real-time update in UI
-          const reels = await loadReels();
-          setRecentReels(reels);
-          const computed = await calculateStatsFromSql();
-          setStats(computed);
-        }
+      eventEmitter.addListener('onProgressUpdate', (e) => {
+        setLiveEvent({ name: 'progress', data: JSON.parse(e.data) });
       }),
 
       eventEmitter.addListener('onEnterReels', () => {
         setLiveEvent({ name: 'enter', data: {} });
         checkService();
-        activeReelTimestamp.current = Date.now();
         refreshStatsAndReels();
       }),
 
-      eventEmitter.addListener('onExitReels', async (e) => {
+      eventEmitter.addListener('onExitReels', () => {
         setLiveEvent({ name: 'exit', data: {} });
         checkService();
-
-        // Finalize last active reel on exit
-        if (activeReelId.current !== -1) {
-          const watchTime = Date.now() - activeReelTimestamp.current;
-          await updateReel(activeReelId.current, { watchTimeMs: watchTime });
-          activeReelId.current = -1;
-        }
-
-        if (settlingTimer.current) {
-          clearTimeout(settlingTimer.current);
-          settlingTimer.current = null;
-        }
-
         refreshStatsAndReels();
       }),
     ];
+
+    // Catch up on reels recorded while the app was in the background.
+    const appStateSub = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        checkService();
+        refreshStatsAndReels();
+      }
+    });
 
     const interval = setInterval(() => {
       checkService();
@@ -364,10 +315,8 @@ export function useReelsTracker() {
 
     return () => {
       subs.forEach(s => s.remove());
+      appStateSub.remove();
       clearInterval(interval);
-      if (settlingTimer.current) {
-        clearTimeout(settlingTimer.current);
-      }
     };
   }, [checkService, refreshStatsAndReels]);
 
@@ -379,6 +328,7 @@ export function useReelsTracker() {
     liveEvent,
     openSettings,
     setToggle,
+    getToggle,
     refreshStats: refreshStatsAndReels,
     refreshReels: refreshStatsAndReels,
     checkService,

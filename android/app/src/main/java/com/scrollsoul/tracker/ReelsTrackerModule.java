@@ -333,6 +333,10 @@ public class ReelsTrackerModule extends ReactContextBaseJavaModule {
         try {
             TrackerDatabaseHelper db = TrackerDatabaseHelper.getInstance(reactContext);
             db.clearAllReels();
+            ReelsTrackerService service = ReelsTrackerService.getInstance();
+            if (service != null) {
+                service.clearSessionCache();
+            }
             promise.resolve(true);
         } catch (Exception e) {
             promise.reject("ERROR", "Failed to clear history: " + e.getMessage(), e);
